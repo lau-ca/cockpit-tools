@@ -53,6 +53,15 @@ require_command() {
   fi
 }
 
+ensure_clean_worktree() {
+  if [[ -n "$(git status --short)" ]]; then
+    echo "[X] 检测到未提交改动，当前脚本不会把工作区改动自动带到 GitHub。"
+    echo "    请先提交后再执行远程打包。未提交文件："
+    git status --short
+    exit 1
+  fi
+}
+
 resolve_repo_from_remote() {
   local remote_name="$1"
   local remote_url
@@ -147,6 +156,7 @@ if [[ -z "$REPO" ]]; then
 fi
 
 cd "$PROJECT_ROOT"
+ensure_clean_worktree
 
 echo "========================================="
 echo "  Cockpit Tools - Windows 远程构建"
