@@ -2,6 +2,15 @@ name: Build Matrix
 
 on:
   workflow_dispatch:
+    inputs:
+      build_target:
+        description: "Build target to run"
+        required: true
+        default: "all"
+        type: choice
+        options:
+          - all
+          - windows
   pull_request:
     branches:
       - "main"
@@ -45,6 +54,7 @@ jobs:
   build:
     name: Build (${{ matrix.label }})
     needs: preflight
+    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.build_target == 'all' || (matrix.label == 'windows-latest' && (github.event.inputs.build_target == 'windows' || github.ref_name == 'feature/build-windows-run')) }}
     runs-on: ${{ matrix.platform }}
     permissions:
       contents: read
@@ -104,6 +114,30 @@ jobs:
 
       - name: Sync versions
         run: npm run sync-version
+
+      - name: Disable updater signing for unsigned CI builds
+        if: env.TAURI_SIGNING_PRIVATE_KEY == '' || env.TAURI_SIGNING_PRIVATE_KEY == 'undefined'
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          node <<'EOF'
+          const fs = require('fs');
+          const path = 'src-tauri/tauri.conf.json';
+          const config = JSON.parse(fs.readFileSync(path, 'utf8'));
+
+          if (config.bundle) {
+            config.bundle.createUpdaterArtifacts = false;
+          }
+
+          if (config.plugins && config.plugins.updater) {
+            delete config.plugins.updater;
+          }
+
+          fs.writeFileSync(path, JSON.stringify(config, null, 2) + '\n');
+          console.log('Disabled updater signing config for unsigned CI build.');
+          EOF
 
       - name: Build app
         shell: bash
@@ -167,4 +201,3 @@ jobs:
           if-no-files-found: error
           path: |
             ${{ matrix.release_dir }}/bundle
-
