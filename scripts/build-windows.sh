@@ -6,12 +6,11 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 REMOTE="${REMOTE:-my}"
 BRANCH="${BRANCH:-feature/build-windows-run}"
-WORKFLOW_FILE="${WORKFLOW_FILE:-build-matrix.yml}"
+WORKFLOW_FILE="${WORKFLOW_FILE:-build-windows-only.yml}"
 ARTIFACT_NAME="${ARTIFACT_NAME:-bundles-windows-latest}"
 OUTPUT_DIR="${OUTPUT_DIR:-$PROJECT_ROOT/windows-build}"
 REPO="${REPO:-}"
 SKIP_PUSH="${SKIP_PUSH:-0}"
-BUILD_TARGET="${BUILD_TARGET:-windows}"
 TIMEOUT_SECONDS="${TIMEOUT_SECONDS:-3600}"
 INTERVAL_SECONDS="${INTERVAL_SECONDS:-20}"
 
@@ -24,11 +23,11 @@ usage() {
   REPO=owner/repo                 GitHub 仓库，默认根据 git remote 自动识别
   REMOTE=my                       Git 远程名，默认 my
   BRANCH=feature/build-windows-run 推送到 GitHub Actions 的目标分支
-  WORKFLOW_FILE=build-matrix.yml  目标 workflow 文件名
+  WORKFLOW_FILE=build-windows-only.yml
+                                  目标 workflow 文件名
   ARTIFACT_NAME=bundles-windows-latest
                                   Windows 构建产物名称
   OUTPUT_DIR=/abs/path            本地下载目录
-  BUILD_TARGET=windows            workflow_dispatch 的构建目标，默认只打 Windows
   SKIP_PUSH=1                     跳过 push，只等待并下载
   TIMEOUT_SECONDS=3600            最长等待秒数
   INTERVAL_SECONDS=20             轮询间隔秒数
@@ -167,7 +166,6 @@ echo "Branch:   $BRANCH"
 echo "Workflow: $WORKFLOW_FILE"
 echo "Artifact: $ARTIFACT_NAME"
 echo "Output:   $OUTPUT_DIR"
-echo "Target:   $BUILD_TARGET"
 
 if [[ "$SKIP_PUSH" != "1" ]]; then
   step "推送当前代码到 $REMOTE/$BRANCH"
@@ -176,24 +174,10 @@ else
   step "跳过推送，直接等待远端 workflow"
 fi
 
-step "触发 GitHub Actions，只构建 ${BUILD_TARGET}"
-dispatch_error_file="$(mktemp)"
-if ! gh workflow run "$WORKFLOW_FILE" \
+step "触发 GitHub Actions，执行 Windows 专用构建"
+gh workflow run "$WORKFLOW_FILE" \
   --repo "$REPO" \
-  --ref "$BRANCH" \
-  -f "build_target=$BUILD_TARGET" 2>"$dispatch_error_file"; then
-  if grep -q 'Unexpected inputs provided' "$dispatch_error_file"; then
-    warn "远端默认分支 workflow 尚未识别 build_target，自动降级为无入参触发。"
-    gh workflow run "$WORKFLOW_FILE" \
-      --repo "$REPO" \
-      --ref "$BRANCH"
-  else
-    cat "$dispatch_error_file" >&2
-    rm -f "$dispatch_error_file"
-    exit 1
-  fi
-fi
-rm -f "$dispatch_error_file"
+  --ref "$BRANCH"
 
 sleep 5
 
