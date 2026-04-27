@@ -2039,7 +2039,7 @@ fn generate_local_api_key() -> String {
 }
 
 fn allocate_random_local_port() -> Result<u16, String> {
-    let listener = StdTcpListener::bind(("127.0.0.1", 0))
+    let listener = StdTcpListener::bind(("0.0.0.0", 0))
         .map_err(|e| format!("分配本地接入端口失败: {}", e))?;
     listener
         .local_addr()
@@ -2209,7 +2209,7 @@ fn ensure_local_port_available(port: u16, current_port: Option<u16>) -> Result<(
     if current_port == Some(port) {
         return Ok(());
     }
-    let listener = StdTcpListener::bind(("127.0.0.1", port))
+    let listener = StdTcpListener::bind(("0.0.0.0", port))
         .map_err(|e| format!("端口 {} 不可用: {}", port, e))?;
     drop(listener);
     Ok(())
@@ -2386,7 +2386,7 @@ async fn ensure_gateway_matches_runtime() -> Result<(), String> {
 
     stop_gateway().await;
 
-    let listener = TcpListener::bind(("127.0.0.1", collection.port))
+    let listener = TcpListener::bind(("0.0.0.0", collection.port))
         .await
         .map_err(|e| format!("启动本地接入服务失败: {}", e))?;
     let (shutdown_sender, mut shutdown_receiver) = watch::channel(false);
